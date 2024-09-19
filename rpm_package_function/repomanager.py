@@ -6,13 +6,12 @@ import logging
 import tarfile
 import tempfile
 from pathlib import Path
-from typing import List, Optional, Set
+from typing import List, Optional, Set, Union
 
 import createrepo_c
 from azure.storage.blob import ContainerClient
 
-from rpm_package_function import AzureDistributionOrganiser
-from rpm_package_function.organiser import AzureFlatOrganiser, BaseOrganiser
+from rpm_package_function import AzureDistributionOrganiser, AzureFlatOrganiser
 from rpm_package_function.rpmpackage import RemoteRpmPackage
 
 log = logging.getLogger(__name__)
@@ -32,7 +31,11 @@ class BaseRepository:
 class AzureBaseRepository(BaseRepository):
     """A class to manage an RPM repository organised by distribution in ABS."""
 
-    def __init__(self, container_client: ContainerClient, organiser: BaseOrganiser):
+    def __init__(
+        self,
+        container_client: ContainerClient,
+        organiser: Union[AzureDistributionOrganiser, AzureFlatOrganiser],
+    ):
         """Create an AzureDistributionRepository object."""
         self.container_client = container_client
         self.organiser = organiser

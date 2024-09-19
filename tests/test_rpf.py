@@ -6,7 +6,7 @@
 import logging
 import os
 from pathlib import Path
-from typing import List
+from typing import List, Union
 
 import pytest
 from azure.identity import DefaultAzureCredential
@@ -15,6 +15,7 @@ from azure.storage.blob import ContainerClient
 from rpm_package_function import (
     AzureDistributionOrganiser,
     AzureDistributionRepository,
+    AzureFlatOrganiser,
     AzureFlatRepository,
     DistributionOrganiser,
     FlatOrganiser,
@@ -142,7 +143,9 @@ def test_list_packages(repository) -> None:
 
 
 def live_clean_package(
-    package: Path, organiser: AzureDistributionOrganiser, assert_exists: bool = False
+    package: Path,
+    organiser: Union[AzureDistributionOrganiser, AzureFlatOrganiser],
+    assert_exists: bool = False,
 ) -> None:
     """Clean up an existing package."""
     # Determine the path of the package
@@ -169,7 +172,7 @@ def live_clean_package(
 
 def live_clean_and_upload_package(
     package: Path,
-    organiser: AzureDistributionOrganiser,
+    organiser: Union[AzureDistributionOrganiser, AzureFlatOrganiser],
     upload_directory: str = "upload",
 ) -> None:
     """Clean up any existing packages and upload a package to the container."""
