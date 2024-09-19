@@ -6,12 +6,13 @@ import logging
 import tarfile
 import tempfile
 from pathlib import Path
-from typing import List, Set
+from typing import List, Optional, Set
 
 import createrepo_c
 from azure.storage.blob import ContainerClient
 
 from rpm_package_function import AzureDistributionOrganiser
+from rpm_package_function.organiser import AzureFlatOrganiser, BaseOrganiser
 from rpm_package_function.rpmpackage import RemoteRpmPackage
 
 log = logging.getLogger(__name__)
@@ -28,17 +29,13 @@ class BaseRepository:
         raise NotImplementedError
 
 
-class AzureDistributionRepository(BaseRepository):
+class AzureBaseRepository(BaseRepository):
     """A class to manage an RPM repository organised by distribution in ABS."""
 
-    def __init__(
-        self, container_client: ContainerClient, upload_directory: str = "upload"
-    ):
+    def __init__(self, container_client: ContainerClient, organiser: BaseOrganiser):
         """Create an AzureDistributionRepository object."""
         self.container_client = container_client
-        self.organiser = AzureDistributionOrganiser(
-            container_client, Path("."), upload_directory=upload_directory
-        )
+        self.organiser = organiser
 
     def process(self) -> None:
         """Run upkeep operations on the repository."""
@@ -64,11 +61,12 @@ class AzureDistributionRepository(BaseRepository):
             log.debug("Skipping non-RPM blob: %s", blob_name)
             return True
 
-        if blob_name.parts[-2] == "upload":
+        parent_parts = blob_name.parent.parts
+        if parent_parts and parent_parts[-1] == "upload":
             log.debug("Skipping upload package: %s", blob_name)
             return True
 
-        if blob_name.parts[-2] == "rejected":
+        if parent_parts and parent_parts[-1] == "rejected":
             log.debug("Skipping rejected package: %s", blob_name)
             return True
 
@@ -219,7 +217,14 @@ class AzureDistributionRepository(BaseRepository):
             log.debug("Created package directory: %s", package_dir)
 
             # Find all the metadata files under the given path
-            blobs = self.container_client.list_blobs(name_starts_with=str(path))
+            # If the path is empty, we want to list all the blobs in the container
+            prefix: Optional[str]
+            if path.parts:
+                prefix = str(path)
+            else:
+                prefix = None
+
+            blobs = self.container_client.list_blobs(name_starts_with=prefix)
 
             downloaded_metadata = []
 
@@ -321,3 +326,35 @@ class AzureDistributionRepository(BaseRepository):
                 delete_client = self.container_client.get_blob_client(str(delete_path))
                 delete_client.delete_blob()
                 log.debug("Deleted obsolete metadata %s", delete_path)
+
+
+class AzureDistributionRepository(AzureBaseRepository):
+    """A class to manage an RPM repository organised by distribution in ABS."""
+
+    def __init__(
+        self, container_client: ContainerClient, upload_directory: str = "upload"
+    ):
+        """Create an AzureDistributionRepository object."""
+        organiser = AzureDistributionOrganiser(
+            container_client, Path("."), upload_directory=upload_directory
+        )
+        super().__init__(
+            container_client,
+            organiser,
+        )
+
+
+class AzureFlatRepository(AzureBaseRepository):
+    """A class to manage a flat RPM repository in ABS."""
+
+    def __init__(
+        self, container_client: ContainerClient, upload_directory: str = "upload"
+    ):
+        """Create an AzureFlatRepository object."""
+        organiser = AzureFlatOrganiser(
+            container_client, Path("."), upload_directory=upload_directory
+        )
+        super().__init__(
+            container_client,
+            organiser,
+        )

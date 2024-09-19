@@ -3,15 +3,28 @@
 """A function app to manage an RPM repository in Azure Blob Storage."""
 
 
-from .organiser import AzureDistributionOrganiser, DistributionOrganiser
-from .repomanager import AzureDistributionRepository
+from .organiser import (
+    AzureDistributionOrganiser,
+    AzureFlatOrganiser,
+    DistributionOrganiser,
+    FlatOrganiser,
+)
+from .repomanager import (
+    AzureBaseRepository,
+    AzureDistributionRepository,
+    AzureFlatRepository,
+)
 from .rpmpackage import BaseRpmPackage, LocalRpmPackage, RemoteRpmPackage
 
 __all__ = [
+    "AzureBaseRepository",
     "AzureDistributionOrganiser",
     "AzureDistributionRepository",
-    "DistributionOrganiser",
+    "AzureFlatOrganiser",
+    "AzureFlatRepository",
     "BaseRpmPackage",
+    "DistributionOrganiser",
+    "FlatOrganiser",
     "LocalRpmPackage",
     "RemoteRpmPackage",
 ]

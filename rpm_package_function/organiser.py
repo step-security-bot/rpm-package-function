@@ -6,7 +6,7 @@
 import logging
 import re
 from pathlib import Path
-from typing import List
+from typing import Callable, List
 
 from azure.storage.blob import ContainerClient
 
@@ -36,8 +36,8 @@ class BaseOrganiser:
         raise NotImplementedError
 
 
-class DistributionOrganiser(BaseOrganiser):
-    """Organiser for RPM packages based on distribution."""
+class LocalOrganiserMixin:
+    """Mixin class for local organisation of RPM packages."""
 
     def __init__(self, root: Path, upload_directory: str = "upload"):
         """Create a new DistributionOrganiser."""
@@ -51,36 +51,6 @@ class DistributionOrganiser(BaseOrganiser):
         ]
         return packages
 
-    def get_path(self, package: BaseRpmPackage) -> Path:
-        """Get the path of the package under this organiser."""
-        # Normalize the package filename.
-        name = package.name()
-        version = package.version()
-        distribution = package.dist()
-        release = package.release()
-        arch = package.arch()
-
-        filename = f"{name}-{version}-{release}.{arch}.rpm"
-        log.debug("Normalised filename: %s", filename)
-
-        # Attempt to split up the distribution into components. Most
-        # distributions that have a distribution use a two digit letter code
-        # followed by a version number.
-        # A few examples:
-        # - fc34: Fedora 34
-        # - el7: RHEL 7
-        # - cm2: AzureLinux 2
-        pattern = r"^([a-z]+)(\d+)$"
-
-        if distribution and (m := re.match(pattern, distribution)):
-            path = self.root / m.group(1) / m.group(2) / filename
-        else:
-            # If we don't have a distribution, put it in the "rejected" directory.
-            path = self.root / "rejected" / filename
-
-        log.debug("Package %s belongs as %s", package, path)
-        return path
-
     def organise(self) -> None:
         """Organise the uploaded packages."""
         for package in self.list_uploads():
@@ -91,9 +61,11 @@ class DistributionOrganiser(BaseOrganiser):
             # Move the package to the new path
             package.move(str(path))
 
+    get_path: Callable[[BaseRpmPackage], Path]
 
-class AzureDistributionOrganiser(DistributionOrganiser):
-    """Organiser for RPM packages based on distribution in Azure Blob Storage."""
+
+class AzureOrganiserMixin:
+    """Mixin class for organising RPM packages in Azure Blob Storage."""
 
     def __init__(
         self,
@@ -102,8 +74,9 @@ class AzureDistributionOrganiser(DistributionOrganiser):
         upload_directory: str = "upload",
     ):
         """Create a new AzureDistributionOrganiser."""
-        super().__init__(root, upload_directory)
         self.container_client = container_client
+        self.root = root
+        self.upload_directory = self.root / upload_directory
 
     def list_uploads(self) -> List[BaseRpmPackage]:
         """List the uploaded packages."""
@@ -140,3 +113,79 @@ class AzureDistributionOrganiser(DistributionOrganiser):
             except FileExistsError as e:
                 # If the file already exists, log a warning and continue
                 log.warning("File already exists: %s", e)
+
+    get_path: Callable[[BaseRpmPackage], Path]
+
+
+class DistributionPathMixin:
+    """Implementation of the get_path method for distributions."""
+
+    root: Path
+
+    def get_path(self, package: BaseRpmPackage) -> Path:
+        """Get the path of the package under this organiser."""
+        # Normalize the package filename.
+        name = package.name()
+        version = package.version()
+        distribution = package.dist()
+        release = package.release()
+        arch = package.arch()
+
+        filename = f"{name}-{version}-{release}.{arch}.rpm"
+        log.debug("Normalised filename: %s", filename)
+
+        # Attempt to split up the distribution into components. Most
+        # distributions that have a distribution use a two digit letter code
+        # followed by a version number.
+        # A few examples:
+        # - fc34: Fedora 34
+        # - el7: RHEL 7
+        # - cm2: AzureLinux 2
+        pattern = r"^([a-z]+)(\d+)$"
+
+        if distribution and (m := re.match(pattern, distribution)):
+            path = self.root / m.group(1) / m.group(2) / filename
+        else:
+            # If we don't have a distribution, put it in the "rejected" directory.
+            path = self.root / "rejected" / filename
+
+        log.debug("Package %s belongs as %s", package, path)
+        return path
+
+
+class FlatPathMixin:
+    """Implementation of the get_path method for flat repositories."""
+
+    root: Path
+
+    def get_path(self, package: BaseRpmPackage) -> Path:
+        """Get the path of the package under this organiser."""
+        # Normalize the package filename.
+        name = package.name()
+        version = package.version()
+        release = package.release()
+        arch = package.arch()
+
+        filename = f"{name}-{version}-{release}.{arch}.rpm"
+        log.debug("Normalised filename: %s", filename)
+
+        path = self.root / filename
+
+        log.debug("Package %s belongs as %s", package, path)
+        return path
+
+
+class DistributionOrganiser(DistributionPathMixin, LocalOrganiserMixin):
+    """Organiser for RPM packages based on distribution."""
+
+
+class FlatOrganiser(FlatPathMixin, LocalOrganiserMixin):
+    """Organiser for RPM packages as a flat directory."""
+
+
+class AzureDistributionOrganiser(DistributionPathMixin, AzureOrganiserMixin):
+    """Organiser for RPM packages based on distribution in Azure Blob Storage."""
+
+
+class AzureFlatOrganiser(FlatPathMixin, AzureOrganiserMixin):
+    """Organiser for RPM packages as flat packages in Azure Blob Storage."""

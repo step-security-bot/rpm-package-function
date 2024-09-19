@@ -51,10 +51,9 @@ poetry run create-resources --location uksouth <resource_group_name>
 
 ## Installing the `dnf` plugin and downloading packages
 
-To download packages:
+To install packages from your new repository:
 
-- Install `dnf-plugin-azure-auth`.
-  - This plugin is currently in progress - watch this space!
+### For distribution repositories
 
 - Create a repository file `/etc/yum.repos.d/<storage account name>.repo` with the following content
   for each distribution you want to support:
@@ -92,6 +91,24 @@ To download packages:
   ```
 
   Multiple repository definitions can exist in the same file.
+
+### For flat repositories
+
+- Create a repository file `/etc/yum.repos.d/<storage account name>.repo` with the following content:
+
+  ```ini
+  [<storage account name>]
+  name=<storage account name>
+  baseurl={base url given by create-resources}/
+  enabled=1
+  gpgcheck=0
+  skip_if_unavailable=1
+  ```
+
+### For all repository types
+
+- Install `dnf-plugin-azure-auth`.
+  - This plugin is currently in progress - watch this space!
 
 - Create an authentication token in the environment with the name `AZURE_STORAGE_TOKEN_<storage account uppercased>` (e.g. `AZURE_STORAGE_TOKEN_RPMREPODEMO`)
 

@@ -9,7 +9,11 @@ import azure.functions as func
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import ContainerClient
 
-from rpm_package_function import AzureDistributionRepository
+from rpm_package_function import (
+    AzureBaseRepository,
+    AzureDistributionRepository,
+    AzureFlatRepository,
+)
 
 app = func.FunctionApp()
 log = logging.getLogger("rpm-package-function")
@@ -22,6 +26,7 @@ logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(
 
 CONTAINER_NAME = os.environ["BLOB_CONTAINER"]
 UPLOAD_DIRECTORY = os.environ.get("UPLOAD_DIRECTORY", "upload")
+REPO_TYPE = os.environ.get("REPO_TYPE", "distribution")
 
 
 @app.function_name(name="eventGridTrigger")
@@ -47,12 +52,19 @@ def event_grid_trigger(event: func.EventGridEvent):
             credential=credential,
         )
 
-    # Create an AzureDistributionRepository object
-    adr = AzureDistributionRepository(
-        container_client, upload_directory=UPLOAD_DIRECTORY
-    )
+    # Create a repository object based on the repo type
+    repo: AzureBaseRepository
+
+    if REPO_TYPE == "flat":
+        repo = AzureFlatRepository(container_client, upload_directory=UPLOAD_DIRECTORY)
+    elif REPO_TYPE == "distribution":
+        repo = AzureDistributionRepository(
+            container_client, upload_directory=UPLOAD_DIRECTORY
+        )
+    else:
+        raise ValueError(f"Invalid repo type: {REPO_TYPE}")
 
     # Process the event
-    adr.process()
+    repo.process()
 
     log.info("Done processing event %s", event.id)

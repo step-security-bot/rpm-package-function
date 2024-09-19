@@ -16,6 +16,9 @@ param appName string = 'rpmfnapp${suffix}'
 @description('The name of the upload directory to use')
 param upload_directory string = 'upload'
 
+@description('The repository type to create')
+param repo_type string = 'distribution'
+
 @description('Using shared keys or managed identity')
 param use_shared_keys bool = true
 
@@ -115,6 +118,11 @@ var common_settings = [
   {
     name: 'UPLOAD_DIRECTORY'
     value: upload_directory
+  }
+  // Pass the value of the repository type to the function app.
+  {
+    name: 'REPO_TYPE'
+    value: repo_type
   }
 ]
 // Construct the application settings
