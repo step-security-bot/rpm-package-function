@@ -9,6 +9,10 @@ import sys
 from pathlib import Path
 
 from rpm_package_function.tooling import common_logging
+from rpm_package_function.tooling.advice import (
+    advice_distribution_repo,
+    advice_flat_repo,
+)
 from rpm_package_function.tooling.bicep_deployment import BicepDeployment
 from rpm_package_function.tooling.func_app import FuncAppBundle
 from rpm_package_function.tooling.poetry import extract_requirements
@@ -38,6 +42,13 @@ def main() -> None:
         default="upload",
         help="Path within the storage container to upload packages to.",
     )
+    parser.add_argument(
+        "--repo-type",
+        choices=["flat", "distribution"],
+        default="distribution",
+        help="The type of repository to create.",
+    )
+
     args = parser.parse_args()
 
     if args.suffix and len(args.suffix) > 14:
@@ -58,6 +69,7 @@ def main() -> None:
 
     initial_parameters = {
         "use_shared_keys": False,
+        "repo_type": args.repo_type,
         "upload_directory": args.upload_directory,
     }
     initial_parameters.update(common_parameters)
@@ -83,12 +95,18 @@ def main() -> None:
     storage_account = outputs["storage_account"]
 
     # Create the function app
+    funcapp_parameters = {
+        "repo_type": args.repo_type,
+        "upload_directory": args.upload_directory,
+    }
+    funcapp_parameters.update(common_parameters)
+
     funcapp = FuncAppBundle(
         name=function_app_name,
         resource_group=args.resource_group,
         storage_account=storage_account,
         python_container=python_container,
-        parameters=common_parameters,
+        parameters=funcapp_parameters,
     )
 
     with funcapp as cm:
@@ -107,56 +125,24 @@ def main() -> None:
     event_grid_deployment.create()
 
     # Inform the user of success!
-    auth_variable = f"AZURE_STORAGE_TOKEN_{storage_account.upper()}"
-
-    print(
-        f"""The repository has been created!
-Upload packages to the '{args.upload_directory}/' directory in the
-'{package_container}' container in the '{storage_account}' storage account.
-The function app '{function_app_name}' will be triggered by new packages
-in that container and regenerate the repository.
-
-To download packages:
-  - Install `dnf-plugin-azure-auth`.
-    - This plugin is currently in progress - watch this space!
-
-  - Create a repository file '/etc/yum.repos.d/{storage_account}.repo' with the following content
-    for each distribution you want to support:
-
-[{storage_account}`dist`]
-name={storage_account}`dist`
-baseurl={base_url}/`dist-letters`/`dist-numbers`/
-enabled=1
-gpgcheck=0
-skip_if_unavailable=1
-
-    For example, to support a distribution 'el8' the repository file would look like:
-
-[{storage_account}el8]
-name={storage_account}el8
-baseurl={base_url}/el/8/
-enabled=1
-gpgcheck=0
-skip_if_unavailable=1
-
-    and a distribution 'fc34' would look like:
-
-[{storage_account}fc34]
-name={storage_account}fc34
-baseurl={base_url}/fc/34/
-enabled=1
-gpgcheck=0
-skip_if_unavailable=1
-
-    Multiple repository definitions can exist in the same file.
-
-  - Create an authentication token in the environment with the name '{auth_variable}'.
-
-    export {auth_variable}=$(az account get-access-token --query accessToken --output tsv --resource https://storage.azure.com)
-
-    You must have 'Storage Blob Data Reader' access to the storage account.
-  - Now, use yum/dnf as normal!"""
-    )
+    if args.repo_type == "distribution":
+        advice_distribution_repo(
+            args.upload_directory,
+            package_container,
+            storage_account,
+            function_app_name,
+            base_url,
+        )
+    elif args.repo_type == "flat":
+        advice_flat_repo(
+            args.upload_directory,
+            package_container,
+            storage_account,
+            function_app_name,
+            base_url,
+        )
+    else:
+        raise ValueError(f"Invalid repo type: {args.repo_type}")
 
 
 def run() -> None:

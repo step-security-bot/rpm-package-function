@@ -16,6 +16,9 @@ param appName string = 'rpmfnapp${suffix}'
 @description('The name of the upload directory to use')
 param upload_directory string = 'upload'
 
+@description('The repository type to create')
+param repo_type string = 'distribution'
+
 @description('Using shared keys or managed identity')
 param use_shared_keys bool = true
 
@@ -93,12 +96,13 @@ resource storageBlobDataContributorRoleAssignment 'Microsoft.Authorization/roleA
 module funcapp 'rg_funcapp.bicep' = if (use_shared_keys) {
   name: 'rpmfunc${suffix}'
   params: {
-    location: location
-    storage_account_name: storageAccount.name
     appName: appName
-    use_shared_keys: true
-    upload_directory: upload_directory
+    location: location
+    repo_type: repo_type
+    storage_account_name: storageAccount.name
     suffix: suffix
+    upload_directory: upload_directory
+    use_shared_keys: true
   }
 }
 

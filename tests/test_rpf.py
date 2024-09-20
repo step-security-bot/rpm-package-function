@@ -6,16 +6,21 @@
 import logging
 import os
 from pathlib import Path
-from typing import List
+from typing import List, Union
 
 import pytest
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import ContainerClient
 
-from rpm_package_function import DistributionOrganiser
-from rpm_package_function.organiser import AzureDistributionOrganiser
-from rpm_package_function.repomanager import AzureDistributionRepository
-from rpm_package_function.rpmpackage import LocalRpmPackage
+from rpm_package_function import (
+    AzureDistributionOrganiser,
+    AzureDistributionRepository,
+    AzureFlatOrganiser,
+    AzureFlatRepository,
+    DistributionOrganiser,
+    FlatOrganiser,
+    LocalRpmPackage,
+)
 
 log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
@@ -85,6 +90,31 @@ def test_organiser(rpm_packages: List[Path]) -> None:
 
 
 @pytest.mark.parametrize(
+    "rpm_packages",
+    [
+        [
+            {
+                "name": "test",
+                "version": "1.0",
+                "release": "1.cm2",
+            }
+        ]
+    ],
+    indirect=True,
+)
+def test_flat_organiser(rpm_packages: List[Path]) -> None:
+    """Test that the organiser organiser returns the correct path for a package."""
+    rpm_package = rpm_packages[0]
+    package = LocalRpmPackage(rpm_package)
+    organiser = FlatOrganiser(Path("test"))
+
+    # Test the path that the organiser would return
+    path = organiser.get_path(package)
+
+    assert path == Path(f"test/{rpm_package.name}")
+
+
+@pytest.mark.parametrize(
     "repository",
     [
         {
@@ -113,7 +143,9 @@ def test_list_packages(repository) -> None:
 
 
 def live_clean_package(
-    package: Path, organiser: AzureDistributionOrganiser, assert_exists: bool = False
+    package: Path,
+    organiser: Union[AzureDistributionOrganiser, AzureFlatOrganiser],
+    assert_exists: bool = False,
 ) -> None:
     """Clean up an existing package."""
     # Determine the path of the package
@@ -140,7 +172,7 @@ def live_clean_package(
 
 def live_clean_and_upload_package(
     package: Path,
-    organiser: AzureDistributionOrganiser,
+    organiser: Union[AzureDistributionOrganiser, AzureFlatOrganiser],
     upload_directory: str = "upload",
 ) -> None:
     """Clean up any existing packages and upload a package to the container."""
@@ -274,3 +306,62 @@ def test_live_repository(rpm_packages) -> None:
     live_clean_metadata(container_client, Path("cm/2/repodata"))
     for rpm_package in rpm_packages:
         live_clean_package(rpm_package, repo.organiser, assert_exists=True)
+
+
+@pytest.mark.skipif(
+    "BLOB_CONTAINER_URL" not in os.environ,
+    reason="BLOB_CONTAINER_URL not set",
+)
+@pytest.mark.parametrize(
+    "rpm_packages",
+    [
+        [
+            {
+                "name": "first",
+                "version": "1.0",
+                "release": "1.cm2",
+            },
+            {
+                "name": "second",
+                "version": "1.0",
+                "release": "1.cm2",
+            },
+            {
+                "name": "notrejected",
+                "version": "2.0",
+                "release": "1",
+            },
+        ]
+    ],
+    indirect=True,
+)
+def test_live_flat_repository(rpm_packages) -> None:
+    """Test that the AzureFlatRepository works."""
+    credential = DefaultAzureCredential()
+    container_client = ContainerClient.from_container_url(
+        container_url=os.environ["BLOB_CONTAINER_URL"],
+        credential=credential,
+    )
+    upload_directory = "upload"
+
+    # Create a new AzureFlatRepository
+    repo = AzureFlatRepository(container_client, upload_directory=upload_directory)
+
+    # Clean the container and upload the packages
+    live_clean_metadata(container_client, Path("./repodata"))
+    for rpm_package in rpm_packages:
+        log.info("Uploading package %s", rpm_package)
+        live_clean_and_upload_package(
+            rpm_package, repo.organiser, upload_directory=upload_directory
+        )
+
+    # Kick the repository as if it had been invoked by the function app.
+    repo.process()
+
+    # # Running the process again will only regenerate the repository data.
+    # repo.process()
+
+    # # Clean up the repository
+    # live_clean_metadata(container_client, Path("./repodata"))
+    # for rpm_package in rpm_packages:
+    #     live_clean_package(rpm_package, repo.organiser, assert_exists=True)
