@@ -8,7 +8,6 @@ def advice_distribution_repo(
     package_container: str,
     storage_account: str,
     function_app_name: str,
-    auth_variable: str,
     base_url: str,
 ):
     """Print advice for a distribution repository."""
@@ -21,9 +20,9 @@ in that container and regenerate the repository.
 
 To download packages:
   - Install `dnf-plugin-azure-auth`.
-    - This plugin is currently in progress - watch this space!
+    - Install the plugin from https://github.com/microsoft/dnf-plugin-azure-auth
 
-  - Create a repository file '/etc/yum.repos.d/{storage_account}.repo' with the following content
+  - Create a repository file `/etc/yum.repos.d/{storage_account}.repo` with the following content
     for each distribution you want to support:
 
 [{storage_account}`dist`]
@@ -32,6 +31,10 @@ baseurl={base_url}/`dist-letters`/`dist-numbers`/
 enabled=1
 gpgcheck=0
 skip_if_unavailable=1
+
+    and add an entry to `/etc/dnf/plugins/azure_auth.conf` with the following format:
+
+[{storage_account}`dist`]
 
     For example, to support a distribution 'el8' the repository file would look like:
 
@@ -42,7 +45,11 @@ enabled=1
 gpgcheck=0
 skip_if_unavailable=1
 
-    and a distribution 'fc34' would look like:
+    and the `azure_auth.conf` configuration entry would look like
+
+[{storage_account}el8]
+
+    A distribution 'fc34' would have a repository file like:
 
 [{storage_account}fc34]
 name={storage_account}fc34
@@ -51,13 +58,13 @@ enabled=1
 gpgcheck=0
 skip_if_unavailable=1
 
+    and the `azure_auth.conf` configuration entry would look like
+
+[{storage_account}fc34]
+
     Multiple repository definitions can exist in the same file.
+    Multiple entries can exist in `azure_auth.conf`.
 
-  - Create an authentication token in the environment with the name '{auth_variable}'.
-
-    export {auth_variable}=$(az account get-access-token --query accessToken --output tsv --resource https://storage.azure.com)
-
-    You must have 'Storage Blob Data Reader' access to the storage account.
   - Now, use yum/dnf as normal!"""
     )
 
@@ -67,7 +74,6 @@ def advice_flat_repo(
     package_container: str,
     storage_account: str,
     function_app_name: str,
-    auth_variable: str,
     base_url: str,
 ):
     """Print advice for a flat repository."""
@@ -80,9 +86,9 @@ in that container and regenerate the repository.
 
 To download packages:
   - Install `dnf-plugin-azure-auth`.
-    - This plugin is currently in progress - watch this space!
+    - Install the plugin from https://github.com/microsoft/dnf-plugin-azure-auth
 
-  - Create a repository file '/etc/yum.repos.d/{storage_account}.repo' with the following content:
+  - Create a repository file `/etc/yum.repos.d/{storage_account}.repo` with the following content:
 
 [{storage_account}]
 name={storage_account}
@@ -91,10 +97,9 @@ enabled=1
 gpgcheck=0
 skip_if_unavailable=1
 
-  - Create an authentication token in the environment with the name '{auth_variable}'.
+  - Add an entry to `/etc/dnf/plugins/azure_auth.conf` with the following format:
 
-    export {auth_variable}=$(az account get-access-token --query accessToken --output tsv --resource https://storage.azure.com)
+[{storage_account}]
 
-    You must have 'Storage Blob Data Reader' access to the storage account.
   - Now, use yum/dnf as normal!"""
     )

@@ -125,15 +125,12 @@ def main() -> None:
     event_grid_deployment.create()
 
     # Inform the user of success!
-    auth_variable = f"AZURE_STORAGE_TOKEN_{storage_account.upper()}"
-
     if args.repo_type == "distribution":
         advice_distribution_repo(
             args.upload_directory,
             package_container,
             storage_account,
             function_app_name,
-            auth_variable,
             base_url,
         )
     elif args.repo_type == "flat":
@@ -142,7 +139,6 @@ def main() -> None:
             package_container,
             storage_account,
             function_app_name,
-            auth_variable,
             base_url,
         )
     else:

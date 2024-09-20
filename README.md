@@ -3,8 +3,7 @@
 Functionality to create an RPM package repository in Azure Blob Storage with
 an Azure Function App to keep it up to date.
 
-This project does not currently include a dnf plugin to add an `Authorization: Bearer` token
-to requests to the repositories - one is in progress.
+For use with [microsoft/dnf-plugin-azure-auth](https://github.com/microsoft/dnf-plugin-azure-auth).
 
 # Getting Started
 
@@ -67,8 +66,14 @@ To install packages from your new repository:
   skip_if_unavailable=1
   ```
 
+  and add an entry to `/etc/dnf/plugins/azure_auth.conf` with the following format:
+
+    ```ini
+  [<storage account name>{distribution}]
+  ```
+
   For example, to support a distribution `el8` in storage account `rpmrepodemo`
-  the repository file might look like:
+  the repository and config file might look like:
 
   ```ini
   [rpmrepodemoel8]
@@ -77,6 +82,10 @@ To install packages from your new repository:
   enabled=1
   gpgcheck=0
   skip_if_unavailable=1
+  ```
+
+  ```ini
+  [rpmrepodemoel8]
   ```
 
   and a distribution 'fc34' would look like:
@@ -90,7 +99,12 @@ To install packages from your new repository:
   skip_if_unavailable=1
   ```
 
-  Multiple repository definitions can exist in the same file.
+  ```ini
+  [rpmrepodemofc34]
+  ```
+
+  Multiple repository definitions can exist in the same repository file.
+  Multiple entries can exist in `azure_auth.conf`.
 
 ### For flat repositories
 
@@ -105,17 +119,19 @@ To install packages from your new repository:
   skip_if_unavailable=1
   ```
 
+- Add an entry to `/etc/dnf/plugins/azure_auth.conf` with the following format:
+
+  ```ini
+  [<storage account name>]
+  ```
+
 ### For all repository types
 
 - Install `dnf-plugin-azure-auth`.
-  - This plugin is currently in progress - watch this space!
+  - Install the plugin from https://github.com/microsoft/dnf-plugin-azure-auth
 
-- Create an authentication token in the environment with the name `AZURE_STORAGE_TOKEN_<storage account uppercased>` (e.g. `AZURE_STORAGE_TOKEN_RPMREPODEMO`)
-
-  export `AZURE_STORAGE_TOKEN_<storage account uppercased>`=$(az account get-access-token --query accessToken --output tsv --resource https://storage.azure.com)
-
-  You must have 'Storage Blob Data Reader' access to the storage account.
-- Now, use yum/dnf as normal!
+- Now, use yum/dnf as normal! The plugin will authenticate using the `az` cli
+  tool to generate credentials for the repository.
 
   ```shell
   $ dnf list | grep rpmrepo
